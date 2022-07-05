@@ -1,18 +1,18 @@
-# employee-360-stream
+# employee-360-streaming
 Public repo for a rough demo of employee 360 using Kafka and KSQLDB.
 
-This demo is a very rough demo of building a pipeline joining three seperate datasets together to form a Customer 360 view using Kafka, Connect and KSQLDB.
+This demo is a **very rough** demo of building a pipeline joining three seperate datasets together to form a Customer 360 view using Kafka, Connect and KSQLDB.
 
 ![overview of the solution pipelines](./solution-pipelines.png)
 
 The datastreams are built on the following:
 
 1. Python Application - Simulating door swipes from an ID access card
-2. PostgreSQL - Stores employe information in a relational database
+2. PostgreSQL - Stores employee information in a relational database
 3. MongoDB - Stores each record when a tool is borrowed
 4. Optional SMS alerting using Twilio
 
-This demo hasn't been matured to automatically deploy the application in a demo environment, nor does it come with any warranty. The RAW topic AVRO schema files have been provided to describe the structure of the Source events.
+This demo hasn't been matured to automatically deploy the application in a demo environment, nor does it come with any warranty. The RAW topic AVRO schema files have been provided in the avro-schemas folder to describe the structure of the Source events.
 
 To get the demo up and running, you will need to do the following:
 
