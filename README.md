@@ -3,7 +3,7 @@ Public repo for a rough demo of employee 360 using Kafka and KSQLDB.
 
 This demo is a very rough demo of building a pipeline joining three seperate datasets together to form a Customer 360 view using Kafka, Connect and KSQLDB.
 
-￼
+![overview of the solution pipelines](./solution-pipelines.png)
 
 The datastreams are built on the following:
 
