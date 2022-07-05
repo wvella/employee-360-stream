@@ -1,0 +1,39 @@
+{
+  "connect.name": "default",
+  "fields": [
+    {
+      "default": null,
+      "name": "_id",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    {
+      "default": null,
+      "name": "date",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    {
+      "default": null,
+      "name": "employee_id",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    {
+      "default": null,
+      "name": "tool",
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  ],
+  "name": "default",
+  "type": "record"
+}

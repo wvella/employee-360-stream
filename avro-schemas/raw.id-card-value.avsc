@@ -1,0 +1,19 @@
+{
+  "fields": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "location",
+      "type": "string"
+    },
+    {
+      "name": "timestamp",
+      "type": "string"
+    }
+  ],
+  "name": "swipe",
+  "namespace": "employee360.idcard.avro",
+  "type": "record"
+}

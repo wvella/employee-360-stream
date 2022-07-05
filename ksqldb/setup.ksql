@@ -1,0 +1,170 @@
+-----------------
+-- RAW STREAMS --
+-----------------
+
+CREATE STREAM raw_idcard WITH (kafka_topic='raw.id-card', value_format='AVRO');
+
+CREATE STREAM raw_employees WITH (kafka_topic='raw.employees.public.employees', value_format='AVRO');
+
+CREATE STREAM raw_tools WITH (kafka_topic='raw.tool_shop.borrows', value_format='AVRO');
+
+-----------------------------
+-- TRANSFORM IDCARD STREAM --
+-----------------------------
+
+CREATE STREAM raw_idcard_txf
+WITH (
+    KAFKA_TOPIC='raw.id-card-txf',
+    VALUE_FORMAT='AVRO'
+) 
+AS SELECT
+    CAST(ID AS STRING) AS ID,
+    LOCATION AS LOCATION,
+    TIMESTAMP AS TIMESTAMP
+FROM raw_idcard
+PARTITION BY CAST(ID AS STRING)
+EMIT CHANGES;
+
+---------------------------
+-- TRANSFORM TOOLS STREAM --
+---------------------------
+
+CREATE STREAM raw_tools_txf
+WITH (
+    KAFKA_TOPIC='raw.tools-txf',
+    VALUE_FORMAT='AVRO'
+) 
+AS SELECT
+    CAST(EMPLOYEE_ID AS STRING) AS ID,
+    TOOL AS TOOL,
+    DATE AS DATE
+FROM raw_tools
+PARTITION BY CAST(EMPLOYEE_ID AS STRING)
+EMIT CHANGES;
+
+---------------------------
+-- CREATE EMPLOYEE TABLE --
+---------------------------
+
+CREATE TABLE employees
+WITH (
+    KAFKA_TOPIC = 'employees'
+) 
+AS SELECT
+  CAST(EMPLOYEE_ID AS STRING) AS EMPLOYEE_ID,
+  LATEST_BY_OFFSET(FIRST_NAME) AS FIRST_NAME,
+  LATEST_BY_OFFSET(LAST_NAME) AS LAST_NAME,
+  LATEST_BY_OFFSET(EMAIL) AS EMAIL
+  FROM RAW_EMPLOYEES
+  GROUP BY CAST(EMPLOYEE_ID AS STRING)
+  EMIT CHANGES;
+
+-----------------------------------
+-- CREATE ENRICHED IDCARD STREAM --
+-----------------------------------
+
+CREATE STREAM enriched_idcard AS 
+SELECT EMPLOYEES.EMPLOYEE_ID AS EmployeeID,
+	   RAW_IDCARD_TXF.LOCATION AS Location,
+       EMPLOYEES.FIRST_NAME AS First_Name,
+       EMPLOYEES.LAST_NAME AS Last_Name,
+       EMPLOYEES.EMAIL AS Email,
+       RAW_IDCARD_TXF.TIMESTAMP AS Timestamp
+FROM RAW_IDCARD_TXF 
+LEFT JOIN EMPLOYEES ON EMPLOYEES.EMPLOYEE_ID = RAW_IDCARD_TXF.ID;
+
+----------------------------------
+-- CREATE ENRICHED TOOLS STREAM --
+----------------------------------
+
+CREATE STREAM enriched_tool AS 
+SELECT employees.EMPLOYEE_ID AS EmployeeID,
+	   raw_tools_txf.Tool AS Tool,
+       raw_tools_txf.Date AS Date,
+       employees.first_name AS First_Name,
+       employees.last_name AS Last_Name,
+       employees.email AS Email
+FROM raw_tools_txf
+LEFT JOIN employees ON raw_tools_txf.id = employees.employee_id EMIT CHANGES;
+
+-------------------------------------
+-- CREATE EMPLOYEE LOCATIONS TABLE --
+-------------------------------------
+
+CREATE TABLE employee_locations AS SELECT location AS Location, COUNT(*) AS NumEmployees 
+FROM enriched_idcard WINDOW TUMBLING (SIZE 10 MINUTES) GROUP BY location;
+
+-- CREATE TABLE employee_atdoor WITH (key_format='JSON') AS SELECT employeeid, location, COUNT(*) AS NumDoors 
+-- FROM enriched_idcard WINDOW TUMBLING (SIZE 10 MINUTES) GROUP BY employeeid, location;
+
+-------------------------------------
+-- CREATE SECRET AREA ALERT STREAM --
+-------------------------------------
+
+CREATE STREAM secret_area_alert AS 
+SELECT enriched_idcard.EMPLOYEEID AS EMPLOYEEID, 
+'SECRET AREA ALERT! ' + enriched_idcard.FIRST_NAME + ' ' + enriched_idcard.LAST_NAME + ' entered ' + enriched_idcard.LOCATION + ' at ' + enriched_idcard.TIMESTAMP AS ALERT,
+enriched_idcard.TIMESTAMP AS TIMESTAMP
+FROM enriched_idcard WHERE enriched_idcard.LOCATION = 'door-6' EMIT CHANGES;
+
+------------------------------------
+-- CREATE TOOL BORROW COUNT TABLE --
+------------------------------------
+
+CREATE TABLE tool_borrow_count WITH (key_format='JSON') AS
+SELECT ENRICHED_TOOL.TOOL, count(*)
+FROM ENRICHED_TOOL WINDOW TUMBLING (SIZE 1 HOUR)
+GROUP BY ENRICHED_TOOL.TOOL
+EMIT CHANGES;
+ 
+
+
+---------------------------------------
+-- CREATE GLOBAL ID CARD STATE TABLE --
+---------------------------------------
+
+CREATE TABLE GLOBAL_IDCARD_STATE
+WITH (
+    KAFKA_TOPIC = 'GLOBAL_IDCARD_STATE'
+) 
+AS SELECT
+  ID AS ID,
+  LATEST_BY_OFFSET(LOCATION) AS LOCATION
+  FROM RAW_IDCARD_TXF 
+  GROUP BY ID
+  EMIT CHANGES;
+
+---------------------------------
+-- CREATE GLOBAL ID TOOL TABLE --
+---------------------------------
+
+CREATE TABLE GLOBAL_TOOL_STATE
+WITH (
+    KAFKA_TOPIC = 'GLOBAL_TOOL_STATE'
+) 
+AS SELECT
+  ID AS ID,
+  LATEST_BY_OFFSET(TOOL) AS TOOL
+  FROM RAW_TOOLS_TXF 
+  GROUP BY ID
+  EMIT CHANGES;
+
+-------------------------------
+-- CREATE EMPLOYEE 360 TABLE --
+-------------------------------
+
+CREATE TABLE EMPLOYEE_360
+WITH (
+    KAFKA_TOPIC = 'EMPLOYEE_360'
+)
+AS SELECT
+    E.EMPLOYEE_ID AS EMPLOYEE_ID,
+    E.FIRST_NAME AS FIRST_NAME,
+    E.LAST_NAME AS LAST_NAME,
+    IDS.LOCATION AS LAST_KNOWN_LOCATION,
+    TS.TOOL AS LAST_BORROWED_TOOL
+FROM EMPLOYEES E
+LEFT OUTER JOIN GLOBAL_IDCARD_STATE IDS ON ((E.EMPLOYEE_ID = IDS.ID))
+LEFT OUTER JOIN GLOBAL_TOOL_STATE TS ON ((E.EMPLOYEE_ID = TS.ID))
+PARTITION BY E.EMPLOYEE_ID
+EMIT CHANGES;

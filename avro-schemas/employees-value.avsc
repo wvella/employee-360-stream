@@ -1,0 +1,31 @@
+{
+  "fields": [
+    {
+      "default": null,
+      "name": "FIRST_NAME",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    {
+      "default": null,
+      "name": "LAST_NAME",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    {
+      "default": null,
+      "name": "EMAIL",
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  ],
+  "name": "KsqlDataSourceSchema",
+  "namespace": "io.confluent.ksql.avro_schemas",
+  "type": "record"
+}
